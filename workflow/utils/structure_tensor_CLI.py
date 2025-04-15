@@ -1,7 +1,3 @@
-import numpy as np
-import numpy.typing as npt
-from scipy import ndimage
-import nibabel as nib
 import sys
 sys.path.insert(1, '../scripts')
 from structure_tensor import calculate_structure_tensor

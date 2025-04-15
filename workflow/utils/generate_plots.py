@@ -1,9 +1,5 @@
 import numpy as np
-import numpy.typing as npt
-from scipy import ndimage
-from openslide import OpenSlide
 from dask.array.gufunc import apply_gufunc
-import nibabel as nib
 import sys
 import matplotlib.pyplot as plt
 import colorsys
@@ -64,7 +60,7 @@ def generate_plots(J, region, save,level):
     theta = 0.5*np.angle((fyy-fxx) + 1j*2*fxy)
     theta[theta<0] = np.angle(np.exp(1j*theta[theta<0])*np.exp(1j*np.pi))
 
-    H = 0 + (1/np.pi)*(1 - 0)*theta
+    H = (1/np.pi)*theta
     S = 1 # Setting to 1 for RGB plot
     V = 1
 
@@ -79,7 +75,7 @@ def generate_plots(J, region, save,level):
     plt.close()
 
 
-    H = 0 + (1/np.pi)*(1 - 0)*theta
+    H = (1/np.pi)*theta
     S = AI
     V = 1 - np.double(region)/255
 
@@ -97,5 +93,4 @@ def generate_plots(J, region, save,level):
     plt.savefig(f'{save}/Directional_anisotropy_HSV_level{level}.png')
     plt.close()
 
-    if __name__ != "__main__": # script not ran directly on python runtime 
-        return AI, theta
+    return AI, theta

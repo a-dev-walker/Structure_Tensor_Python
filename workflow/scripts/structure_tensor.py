@@ -1,12 +1,10 @@
 import numpy as np
-import numpy.typing as npt
 from scipy import ndimage
-import nibabel as nib
-from openslide import OpenSlide
+import openslide
 import sys
 sys.path.insert(1, '../utils')
 from generate_plots import generate_plots
-
+from dask_image.ndfilters import gaussian_filter
 
 def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, level=2, 
                                height=None, width=None, location=(0,0), truncate=4):
@@ -62,12 +60,25 @@ def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, lev
     """
 
     if not isinstance(img, np.ndarray): # if image is a path and not array
-        img = OpenSlide(img)
 
-        if np.logical_and(height==None,width==None):
-            size = (int(img.properties[f'openslide.level[{level}].width']), int(img.properties[f'openslide.level[{level}].height']))
+        if 'tif' in img or 'tiff' in img: #OpenSlide having trouble reading tiff
+            from PIL import Image
+            pil = Image.open(img)
+            img = openslide.ImageSlide(pil)
+            level = 0
+
+            if np.logical_and(height==None,width==None):
+                size = img.dimensions
+            else:
+                size = (width, height)
+
         else:
-            size = (width, height)
+            img = openslide.OpenSlide(img)
+
+            if np.logical_and(height==None,width==None):
+                size = (int(img.properties[f'openslide.level[{level}].width']), int(img.properties[f'openslide.level[{level}].height']))
+            else:
+                size = (width, height)
 
         region = img.read_region(location, level, size)
         region = np.float32(region)[:,:,0]
@@ -76,11 +87,16 @@ def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, lev
         region = img
         
     # DoG
+    #gx = gaussian_filter(region,sigma=sigma,order=(1,0),mode="nearest",truncate=truncate)
+    #gy = gaussian_filter(region,sigma=sigma,order=(0,1),mode="nearest",truncate=truncate)
     gx = ndimage.gaussian_filter(region,sigma=sigma,order=(1,0),mode="nearest",truncate=truncate)
     gy = ndimage.gaussian_filter(region,sigma=sigma,order=(0,1),mode="nearest",truncate=truncate)
 
 
     # Neighborhood to integrate over (resolution)
+    #fxx = gaussian_filter(gx*gx,sigma=sigma_avg,mode="constant",truncate=truncate)
+    #fxy = gaussian_filter(gx*gy,sigma=sigma_avg,mode="constant",truncate=truncate)
+    #fyy = gaussian_filter(gy*gy,sigma=sigma_avg,mode="constant",truncate=truncate)
     fxx = ndimage.gaussian_filter(gx*gx,sigma=sigma_avg,mode="constant",truncate=truncate)
     fxy = ndimage.gaussian_filter(gx*gy,sigma=sigma_avg,mode="constant",truncate=truncate)
     fyy = ndimage.gaussian_filter(gy*gy,sigma=sigma_avg,mode="constant",truncate=truncate)
