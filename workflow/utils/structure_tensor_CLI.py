@@ -1,9 +1,12 @@
 import sys
-sys.path.insert(1, '../scripts')
-from structure_tensor import calculate_structure_tensor
+import os
+script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts'))
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+from structure_tensor import calculate_structure_tensor, calculate_structure_tensor_fourier, calculate_structure_tensor_cupy
 
 
-""" 
+"""
 Command line interface for generating structure tensor and plots
 Author:
 Bradley Karat
@@ -24,11 +27,12 @@ if __name__ == "__main__": # script is ran directly on python runtime
         parser.add_argument("-sigma_avg", type=float, help="Standard deviation of Gaussian kernel (pixels).")
         parser.add_argument("-save", type=str, help="Output path to save structure tensor and plots.")
         parser.add_argument("-make_plots", nargs='?', type=bool, default=True, help="If true will generate plots of anisotropy index, RGB encoded direction, and HSV where saturation is anisotropy index, and value is image intensity. Default is True")
-        parser.add_argument("-level", nargs='?', type=int, default=2, help="Resolution to load the image in (0 = highest). Default is 2")
+        parser.add_argument("-level", nargs='?', type=int, default=2, help="Resolution to load the image in (0 = highest). Forced to 0 for tiff images.")
         parser.add_argument("-height", nargs='?', type=int, default=None, help="Height of region to analyze. If none will use the full image.")
         parser.add_argument("-width", nargs='?', type=int, default=None, help="Width of region to analyze. If none will use the full image.")
         parser.add_argument("-location", nargs='?', type=tuple, default=(0,0), help="Top left pixel which defines the location of the image. Default is (0,0).")
         parser.add_argument("-truncate", nargs='?', type=int, default=4, help="Truncate the filter at this many standard deviations. Default is 4")
+        parser.add_argument("-save_nparray", nargs='?', type=bool, default=False, help="If true will save the structure tensor as a numpy array. Default is False")
         args = parser.parse_args()
     
         img = args.img
@@ -41,5 +45,8 @@ if __name__ == "__main__": # script is ran directly on python runtime
         width = args.width
         location = args.location
         truncate = args.truncate
+        save_nparray = args.save_nparray
 
-        calculate_structure_tensor(img,sigma, sigma_avg, save, make_plots, level, height, width, location, truncate)
+        #calculate_structure_tensor(img,sigma, sigma_avg, save, make_plots, level, height, width, location, truncate, save_nparray)
+        #calculate_structure_tensor_fourier(img,sigma, sigma_avg, os.path.join(save, "fourier"), make_plots, level, height, width, location, truncate, save_nparray)
+        calculate_structure_tensor_cupy(img,sigma, sigma_avg, os.path.join(save, "cupy"), make_plots, level, height, width, location, truncate, save_nparray)
