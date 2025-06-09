@@ -3,7 +3,7 @@ from scipy import ndimage
 import openslide
 import sys
 sys.path.insert(1, '../utils')
-from generate_plots import generate_plots, cupy_generate_plots
+from generate_plots import generate_plots, cupy_generate_plots, profile_memory_usage, generate_plots_daskplotlib
 from dask_image.ndfilters import gaussian_filter
 import torch
 import torch.fft as fft
@@ -123,7 +123,9 @@ def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, lev
         if save_nparray==True:
             np.save(f'{save}/structure_tensor.npy',J)
         if make_plots==True:
-            AI, theta = generate_plots(J,region,save,level)
+            #AI, theta = generate_plots(J,region,save,level)
+            print("Generating plots with daskplotlib")
+            generate_plots_daskplotlib(J,region,save,level)
             if save_nparray==True:
                 np.save(f'{save}/Anisotropy_Index.npy',AI)
                 np.save(f'{save}/theta.npy',theta)
@@ -450,6 +452,8 @@ def calculate_structure_tensor_cupy(img, sigma, sigma_avg, save, make_plots=True
             truncate=truncate
         )
         cp.cuda.Stream.null.synchronize()
+
+        print("finished gy")
         
         # Compute squared terms with memory efficiency
         gx_squared = cp.square(gx)
@@ -504,23 +508,23 @@ def calculate_structure_tensor_cupy(img, sigma, sigma_avg, save, make_plots=True
     J = cp.stack([fxx, fxy, fxy, fyy], axis=2)
     J = J.reshape([x, y, 2, 2])
 
-    ## convert to lumpy array
-    J_numpy = J.get()
 
-    
     
 
     if save != None:
         if save_nparray==True:
             np.save(f'{save}/structure_tensor.npy',J)
         if make_plots==True:
-            AI, theta = generate_plots(J_numpy,region.get(),save,level)
-            #AI, theta = cupy_generate_plots(J,region,save,level)
+            #AI, theta = generate_plots(J.get(),region.get(),save,level)
+            #cupy_generate_plots(J,region,save,level)
+            #profile_memory_usage(J.get(), region, save, level)
+            print("Generating plots with daskplotlib")
+            generate_plots_daskplotlib(J.get(),region.get(),save,level)
             if save_nparray==True:
                 np.save(f'{save}/Anisotropy_Index.npy',AI)
                 np.save(f'{save}/theta.npy',theta)
 
-    return J
+    #return J
 
 ## Create a brain mask using Canny edge detection
 def create_brain_mask_canny(image, sigma=3, lower_threshold=10, upper_threshold=50):

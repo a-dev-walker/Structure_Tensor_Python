@@ -4,7 +4,7 @@ script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 from structure_tensor import calculate_structure_tensor, calculate_structure_tensor_fourier, calculate_structure_tensor_cupy
-
+import torch
 
 """
 Command line interface for generating structure tensor and plots
@@ -46,6 +46,32 @@ if __name__ == "__main__": # script is ran directly on python runtime
         location = args.location
         truncate = args.truncate
         save_nparray = args.save_nparray
+
+        # If CUDA is available, print additional GPU details
+        if torch.cuda.is_available():
+            print("Number of GPUs:", torch.cuda.device_count())
+            print("Current GPU device:", torch.cuda.current_device())
+            print("GPU Name:", torch.cuda.get_device_name(0))
+            
+            # Get GPU properties
+            gpu_properties = torch.cuda.get_device_properties(0)
+            print("\nGPU Properties:")
+            print(f"Name: {gpu_properties.name}")
+            print(f"Total Memory: {gpu_properties.total_memory / (1024**3):.2f} GB")
+            print(f"Compute Capability: {gpu_properties.major}.{gpu_properties.minor}")
+
+        print("\nCalculating structure tensor with the following parameters:")
+        print(f"Image: {img}")
+        print(f"Sigma: {sigma}")
+        print(f"Sigma Average: {sigma_avg}")
+        print(f"Save Path: {save}")
+        print(f"Make Plots: {make_plots}")
+        print(f"Level: {level}")
+        print(f"Height: {height}")
+        print(f"Width: {width}")
+        print(f"Location: {location}")
+        print(f"Truncate: {truncate}")
+        print(f"Save Numpy Array: {save_nparray}")
 
         #calculate_structure_tensor(img,sigma, sigma_avg, save, make_plots, level, height, width, location, truncate, save_nparray)
         #calculate_structure_tensor_fourier(img,sigma, sigma_avg, os.path.join(save, "fourier"), make_plots, level, height, width, location, truncate, save_nparray)
