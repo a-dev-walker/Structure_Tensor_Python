@@ -10,6 +10,7 @@ import cupyx.scipy.ndimage as ndimage
 import memory_profiler
 import psutil
 import matplotlib
+from PIL import Image
 
 
 #if __name__ == "__main__": # script is ran directly on python runtime. Assuming
@@ -23,7 +24,7 @@ import matplotlib
 #        save = sys.argv[4]
 #    generate_plots(img,sigma,sigma_avg,save)
 
-def generate_plots(J, region, save,level, mask=None):
+def generate_plots(J, region, save,level, mask=None, DPI=100):
     
     """ 
     Generate plots after calculating structure tensor
@@ -554,7 +555,7 @@ def profile_memory_usage(J, region, save, level, mask=None):
 
 
 
-def generate_plots_daskplotlib(J, region, save,level, mask=None):
+def generate_plots_daskplotlib(J, region, save,level, mask=None, DPI=100, save_full_res=False):
     
     """ 
     Generate plots after calculating structure tensor
@@ -571,6 +572,10 @@ def generate_plots_daskplotlib(J, region, save,level, mask=None):
         mask:
             Mask used to calculate the structure tensor. If not provided, 
             the function will use the entire image.
+        DPI:
+            Dots per inch for high resolution plots. Default is 100.
+        save_full_res:
+            If True, saves full resolution tiff files. Default is False.
     Returns:
         Plots of anisotropy index, RGB encoded direction, and HSV where 
         saturation is anisotropy index, and value is image intensity.
@@ -602,8 +607,14 @@ def generate_plots_daskplotlib(J, region, save,level, mask=None):
     #plt.colorbar(label='Anisotropy Index')
     plt.title(f'Anisotropy Index (Level {level})')
     plt.savefig(f'{save}/Anisotropy_Index_level{level}.png')
+    plt.savefig(f'{save}/Anisotropy_Index_High_res_level{level}.png', dpi=DPI)
     plt.close()
-    
+
+    if save_full_res:
+        AI_scaled = AI.compute() * 255  # Scale to 0-255 for saving as image
+        pil_image = Image.fromarray(AI_scaled.astype(np.uint8))
+        pil_image.save(f'{save}/Anisotropy_Index_full_res_level{level}.tiff')
+
     print("Creating Directional RGB plot")
 
     fyy = J[:,:,1,1]
@@ -627,7 +638,13 @@ def generate_plots_daskplotlib(J, region, save,level, mask=None):
     plt.imshow(imgRGB)
     plt.title(f'Directional RGB (Level {level})')
     plt.savefig(f'{save}/Directional_RGB_level{level}.png')
+    plt.savefig(f'{save}/Directional_RGB_High_res_level{level}.png', dpi=DPI)
     plt.close()
+
+    if save_full_res:
+        imgRGB_scaled = (imgRGB * 255).astype(np.uint8)  # Scale to 0-255 for saving as image
+        pil_image = Image.fromarray(imgRGB_scaled, mode='RGB')
+        pil_image.save(f'{save}/Directional_RGB_full_res_level{level}.tiff')
 
     print("Creating Directional Anisotropy HSV plot")
 
@@ -636,9 +653,8 @@ def generate_plots_daskplotlib(J, region, save,level, mask=None):
     V = 1 - np.double(region)/255 # Convert region to double and normalize to [0, 1]
 
     ## clear theta and AI to free memory
-    del w, v
+    del w
     theta = None
-    AI = None
 
     HSV = np.stack((H, S, V), axis=-1)
     imgRGB = matplotlib.colors.hsv_to_rgb(HSV)
@@ -647,7 +663,73 @@ def generate_plots_daskplotlib(J, region, save,level, mask=None):
     plt.imshow(imgRGB)
     plt.title(f'Directional Anisotropy HSV (Level {level})')
     plt.savefig(f'{save}/Directional_anisotropy_HSV_level{level}.png')
+    plt.savefig(f'{save}/Directional_anisotropy_HSV_High_res_level{level}.png', dpi=DPI)
     plt.close()
+
+    if save_full_res:
+        imgRGB_scaled = (imgRGB * 255).astype(np.uint8)  # Scale to 0-255 for saving as image
+        pil_image = Image.fromarray(imgRGB_scaled, mode='RGB')
+        pil_image.save(f'{save}/Directional_anisotropy_HSV_full_res_level{level}.tiff')
+
+
+    ## Plot eigenvectors to try and get just RG
+    abs_first_eigenvector = np.abs(v[:, :, 0])
+
+    ## convert eigenvector to RGB where the first eigenvector is green, the second is red, and the third is blue and blue is 0
+    def eigenvector_to_rgb(eigenvector):
+        red = eigenvector[..., 1]
+        green = eigenvector[..., 0]
+        blue = np.zeros_like(red)
+        return np.stack([red, green, blue], axis=-1)
+
+    # Convert eigenvectors to RGB
+    eigenvector_rgb = eigenvector_to_rgb(abs_first_eigenvector)
+
+    ## multiply the RGB values by the Anisotropy Index
+    eigenvector_rgb_weighted = eigenvector_rgb * AI[..., np.newaxis]
+
+    # Display the RGB image
+    fig, ax = plt.subplots(figsize=(12, 12))
+    plt.imshow(eigenvector_rgb_weighted)
+    plt.title(f'DTI Analogue Eigenvector RGB (Level {level})')
+    plt.savefig(f'{save}/DTI_analogue_RGB_level{level}.png')
+    plt.savefig(f'{save}/DTI_analogue_RGB_High_res_level{level}.png', dpi=DPI)
+    plt.close()
+
+    if True:
+        eigenvector_rgb_scaled = (eigenvector_rgb_weighted * 255).astype(np.uint8)  # Scale to 0-255 for saving as image
+        pil_image = Image.fromarray(eigenvector_rgb_scaled.compute(), mode='RGB')
+        pil_image.save(f'{save}/DTI_analogue_RGB_full_res_level{level}.tiff')
+
+
+
+    ## Create DTI Eigenvector plot with region as background
+
+    # Convert RGB to HSV
+    eigenvector_hsv = matplotlib.colors.rgb_to_hsv(eigenvector_rgb)
+
+    ## change values in hsv to account for anisotropy index and image values
+    H = eigenvector_hsv[..., 0]
+    S = AI.compute()  # Using the Anisotropy Index as saturation
+    V = 1 - np.double(region)/255
+
+    ## concatenate H, S, V into a single array
+    HSV = np.stack((H, S, V), axis=-1)
+    # convert HSV to RGB
+    imgRGB_DTI = matplotlib.colors.hsv_to_rgb(HSV)
+
+    # Display the RGB image
+    fig, ax = plt.subplots(figsize=(12,12))
+    plt.imshow(imgRGB_DTI)
+    plt.title(f'DTI Analogue Directional Anisotropy HSV (Level {level})')
+    plt.savefig(f'{save}/DTI_analogue_Directional_anisotropy_HSV_region_level{level}.png')
+    plt.savefig(f'{save}/DTI_analogue_Directional_anisotropy_HSV_region_High_res_level{level}.png', dpi=DPI)
+    plt.close()
+
+    if save_full_res:
+        imgRGB_DTI_scaled = (imgRGB_DTI * 255).astype(np.uint8)  # Scale to 0-255 for saving as image
+        pil_image = Image.fromarray(imgRGB_DTI_scaled, mode='RGB')
+        pil_image.save(f'{save}/DTI_analogue_Directional_anisotropy_HSV_region_full_res_level{level}.tiff')
 
     # return AI, theta
 

@@ -12,12 +12,14 @@ import scipy.ndimage as ndi
 import cupy as cp
 import cupyx.scipy.ndimage as ndimage_cupy
 import os
+from skimage.transform import rotate
 
 ## Set the environment variable for CuPy cache directory
 os.environ['CUPY_CACHE_DIR'] = '/gpfs/scratch/adw9882/.cupy'  # Adjust to a directory with sufficient space
 
 def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, level=2, 
-                               height=None, width=None, location=(0,0), truncate=4, save_nparray=False):
+                               height=None, width=None, location=(0,0), truncate=4, save_nparray=False,
+                               rotate_angle=None):
     
     """ 
     Calculate structure tensor
@@ -99,6 +101,11 @@ def calculate_structure_tensor(img, sigma, sigma_avg, save, make_plots=True, lev
         
     else:
         region = img
+
+    if rotate_angle is not None:
+        # Rotate the region by the specified angle
+        region = rotate(region, angle=rotate_angle, resize=True, preserve_range=True, anti_aliasing=True)
+        region = np.float32(region)
         
     # DoG
     #gx = gaussian_filter(region,sigma=sigma,order=(1,0),mode="nearest",truncate=truncate)
@@ -519,7 +526,7 @@ def calculate_structure_tensor_cupy(img, sigma, sigma_avg, save, make_plots=True
             #cupy_generate_plots(J,region,save,level)
             #profile_memory_usage(J.get(), region, save, level)
             print("Generating plots with daskplotlib")
-            generate_plots_daskplotlib(J.get(),region.get(),save,level)
+            generate_plots_daskplotlib(J.get(),region.get(),save,level, DPI=300)
             if save_nparray==True:
                 np.save(f'{save}/Anisotropy_Index.npy',AI)
                 np.save(f'{save}/theta.npy',theta)
